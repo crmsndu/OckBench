@@ -1,7 +1,6 @@
 workdir/
 cache/
 log/
-CLAUDE.md
 # Python
 __pycache__/
 *.py[cod]
