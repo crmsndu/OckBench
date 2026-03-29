@@ -18,6 +18,8 @@ from .schemas import (
 from ..loaders.base import get_loader
 from ..models.base import BaseModelClient
 from ..models.openai_api import OpenAIClient
+from ..models.openai_responses_api import OpenAIResponsesClient
+from ..models.anthropic_api import AnthropicClient
 from ..models.gemini_api import GeminiClient
 from ..evaluators.math_eval import get_evaluator
 from ..utils.logger import setup_logger, get_experiment_filename
@@ -112,6 +114,10 @@ class BenchmarkRunner:
         
         if self.config.provider == 'openai':
             return OpenAIClient(**client_kwargs)
+        elif self.config.provider == 'openai-responses':
+            return OpenAIResponsesClient(**client_kwargs)
+        elif self.config.provider == 'anthropic':
+            return AnthropicClient(**client_kwargs)
         elif self.config.provider == 'gemini':
             return GeminiClient(**client_kwargs)
         elif self.config.provider == 'generic':

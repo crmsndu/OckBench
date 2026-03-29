@@ -4,6 +4,9 @@ google-genai
 pydantic
 pyyaml
 
+# HTTP client for streaming API calls
+httpx
+
 # Async and utilities
 aiohttp
 tqdm

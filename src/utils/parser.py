@@ -57,7 +57,7 @@ Examples:
     parser.add_argument(
         "--provider",
         type=str,
-        choices=["openai", "gemini", "generic"],
+        choices=["openai", "openai-responses", "anthropic", "gemini", "generic"],
         default="openai",
         help="API provider type (default: openai)",
     )

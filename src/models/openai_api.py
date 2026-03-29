@@ -120,25 +120,48 @@ class OpenAIClient(BaseModelClient):
                 "chat_template_kwargs": {thinking_key: kwargs["enable_thinking"]}
             }
 
-        # Make API call
+        # Make API call with streaming to avoid proxy gateway timeouts
         try:
-            response = await self.client.chat.completions.create(**request_params)
-            
-            # Extract response text
-            text = response.choices[0].message.content or ""
-            finish_reason = response.choices[0].finish_reason
-            
-            # Extract token usage
-            tokens = self._extract_tokens(response)
-            
+            request_params["stream"] = True
+            request_params["stream_options"] = {"include_usage": True}
+
+            text = ""
+            finish_reason = None
+            model_name = self.model
+            usage_data = None
+
+            stream = await self.client.chat.completions.create(**request_params)
+            async for chunk in stream:
+                if chunk.model:
+                    model_name = chunk.model
+
+                if chunk.choices:
+                    delta = chunk.choices[0].delta
+                    if delta and delta.content:
+                        text += delta.content
+                    if chunk.choices[0].finish_reason:
+                        finish_reason = chunk.choices[0].finish_reason
+
+                # Usage comes in the final chunk when stream_options.include_usage is set
+                if chunk.usage:
+                    usage_data = chunk
+
+            if usage_data:
+                tokens = self._extract_tokens(usage_data)
+            else:
+                tokens = TokenUsage(
+                    prompt_tokens=0, answer_tokens=0, reasoning_tokens=0,
+                    output_tokens=0, total_tokens=0,
+                )
+
             return ModelResponse(
                 text=text,
                 tokens=tokens,
                 latency=0,  # Will be set by base class
-                model=response.model,
-                finish_reason=finish_reason
+                model=model_name,
+                finish_reason=finish_reason or "stop",
             )
-        
+
         except Exception as e:
             logger.error(f"OpenAI API error: {e}")
             raise
@@ -154,7 +177,6 @@ class OpenAIClient(BaseModelClient):
             TokenUsage: Token usage information
         """
         usage = response.usage
-        
         # Standard token fields
         prompt_tokens = getattr(usage, 'prompt_tokens', 0)
         completion_tokens = getattr(usage, 'completion_tokens', 0)

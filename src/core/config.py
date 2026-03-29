@@ -64,6 +64,8 @@ def _apply_env_vars(config_dict: Dict[str, Any]) -> Dict[str, Any]:
         # Try provider-specific environment variables
         env_key_map = {
             'openai': 'OPENAI_API_KEY',
+            'openai-responses': 'OPENAI_API_KEY',
+            'anthropic': 'ANTHROPIC_API_KEY',
             'gemini': 'GEMINI_API_KEY',
             'generic': 'API_KEY'
         }

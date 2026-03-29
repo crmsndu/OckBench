@@ -1,0 +1,159 @@
+"""
+OpenAI Responses API client implementation.
+
+Uses the /v1/responses endpoint which supports reasoning effort for
+models like gpt-5.4-pro that don't work with the chat completions endpoint.
+Uses streaming to avoid proxy gateway timeouts on long-running requests.
+"""
+import json
+import logging
+from typing import Optional
+
+import httpx
+
+from .base import BaseModelClient
+from ..core.schemas import ModelResponse, TokenUsage
+
+
+logger = logging.getLogger(__name__)
+
+
+class OpenAIResponsesClient(BaseModelClient):
+    """
+    Client for OpenAI Responses API (/v1/responses).
+
+    Some models (e.g. gpt-5.4-pro) only support the Responses API,
+    not the Chat Completions API. This client also properly passes
+    reasoning effort parameters.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: int = 120,
+        max_retries: int = 3,
+        **kwargs
+    ):
+        super().__init__(model, api_key, base_url, timeout, max_retries, **kwargs)
+
+        self.endpoint = (base_url or "https://api.openai.com/v1").rstrip("/")
+        if not self.endpoint.endswith("/v1"):
+            # If base_url already includes /v1, use as-is; otherwise append
+            if "/v1" not in self.endpoint:
+                self.endpoint += "/v1"
+        self.responses_url = self.endpoint + "/responses"
+
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key or 'dummy-key'}",
+        }
+
+        self._http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(timeout, connect=30.0),
+        )
+
+    async def _call_api(
+        self,
+        prompt: str,
+        temperature: float = 0.0,
+        max_output_tokens: int = 4096,
+        **kwargs
+    ) -> ModelResponse:
+        """Call OpenAI Responses API."""
+        request_body = {
+            "model": self.model,
+            "input": prompt,
+            "max_output_tokens": max_output_tokens,
+        }
+
+        # Set temperature for non-reasoning calls
+        reasoning_effort = kwargs.get("reasoning_effort")
+        if reasoning_effort:
+            request_body["reasoning"] = {"effort": reasoning_effort}
+            # Reasoning models don't support temperature
+        else:
+            request_body["temperature"] = temperature
+
+        # Use streaming to avoid proxy gateway timeouts
+        request_body["stream"] = True
+
+        try:
+            text = ""
+            model_name = self.model
+            prompt_tokens = 0
+            output_tokens_total = 0
+            reasoning_tokens = 0
+            total_tokens = 0
+            status = "completed"
+            buffer = ""
+
+            async with self._http_client.stream(
+                "POST", self.responses_url, headers=self.headers, json=request_body
+            ) as resp:
+                if resp.status_code != 200:
+                    body = await resp.aread()
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {resp.status_code}",
+                        request=resp.request,
+                        response=resp,
+                    )
+
+                async for chunk in resp.aiter_text():
+                    buffer += chunk
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
+                        if not line or not line.startswith("data: "):
+                            continue
+                        data_str = line[6:]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            d = json.loads(data_str)
+                            event_type = d.get("type")
+
+                            if event_type == "response.output_text.delta":
+                                text += d.get("delta", "")
+
+                            elif event_type == "response.completed":
+                                resp_data = d.get("response", {})
+                                model_name = resp_data.get("model", model_name)
+                                status = resp_data.get("status", status)
+                                usage = resp_data.get("usage", {})
+                                prompt_tokens = usage.get("input_tokens", 0)
+                                output_tokens_total = usage.get("output_tokens", 0)
+                                total_tokens = usage.get("total_tokens", 0)
+                                output_details = usage.get("output_tokens_details", {})
+                                if output_details:
+                                    reasoning_tokens = output_details.get("reasoning_tokens", 0) or 0
+
+                        except json.JSONDecodeError:
+                            continue
+
+            answer_tokens = output_tokens_total - reasoning_tokens
+
+            tokens = TokenUsage(
+                prompt_tokens=prompt_tokens,
+                answer_tokens=answer_tokens,
+                reasoning_tokens=reasoning_tokens,
+                output_tokens=output_tokens_total,
+                total_tokens=total_tokens,
+            )
+
+            return ModelResponse(
+                text=text,
+                tokens=tokens,
+                latency=0,  # Set by base class
+                model=model_name,
+                finish_reason=status,
+            )
+
+        except httpx.HTTPStatusError as e:
+            error_body = e.response.text if hasattr(e.response, 'text') else str(e)
+            logger.error(f"Responses API HTTP error: {e.response.status_code} - {error_body}")
+            raise Exception(f"Error code: {e.response.status_code} - {error_body}")
+        except Exception as e:
+            logger.error(f"Responses API error: {e}")
+            raise
