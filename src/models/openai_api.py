@@ -8,6 +8,8 @@ Supports:
 """
 import logging
 from typing import Optional
+
+import httpx
 from openai import AsyncOpenAI
 
 from .base import BaseModelClient
@@ -46,9 +48,17 @@ class OpenAIClient(BaseModelClient):
         """
         super().__init__(model, api_key, base_url, timeout, max_retries, **kwargs)
         
-        # Initialize OpenAI client
-        # Let SDK read OPENAI_API_KEY from environment if not provided
-        client_kwargs = {'timeout': timeout}
+        # Initialize OpenAI client.
+        # - max_retries=0: BaseModelClient.generate owns retry; SDK's own loop
+        #   would stack with ours (up to 9 effective attempts) and double the
+        #   wall clock on transient errors.
+        # - timeout is interpreted per-operation, not as a total deadline:
+        #   `read` caps the gap between streamed chunks, so long reasoning
+        #   runs can complete while a truly stalled stream still fails.
+        client_kwargs = {
+            'timeout': httpx.Timeout(connect=30.0, read=float(timeout), write=60.0, pool=30.0),
+            'max_retries': 0,
+        }
         if api_key:
             client_kwargs['api_key'] = api_key
         if base_url:
@@ -56,7 +66,7 @@ class OpenAIClient(BaseModelClient):
             # Local servers may not need a real key
             if 'api_key' not in client_kwargs:
                 client_kwargs['api_key'] = 'dummy-key'
-        
+
         self.client = AsyncOpenAI(**client_kwargs)
     
     async def _call_api(
@@ -119,6 +129,14 @@ class OpenAIClient(BaseModelClient):
             request_params["extra_body"] = {
                 "chat_template_kwargs": {thinking_key: kwargs["enable_thinking"]}
             }
+
+        # Handle OpenRouter reasoning parameter for models like DeepSeek
+        # OpenRouter uses {"reasoning": {"enabled": true}} instead of extra_body
+        if "openrouter" in (self.base_url or ""):
+            if kwargs.get("enable_thinking"):
+                request_params["extra_body"] = {"reasoning": {"enabled": True}}
+            elif kwargs.get("reasoning_effort") and not self._is_reasoning_model():
+                request_params["extra_body"] = {"reasoning": {"effort": kwargs["reasoning_effort"]}}
 
         # Make API call with streaming to avoid proxy gateway timeouts
         try:
