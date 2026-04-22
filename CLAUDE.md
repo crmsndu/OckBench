@@ -19,7 +19,7 @@ A curated **Selected** subset (200 problems: 100 math + 60 coding + 40 science) 
 ```bash
 uv venv --python 3.12 --managed-python
 source .venv/bin/activate
-uv pip install -r requirements.txt
+uv pip install -e .
 ```
 
 Always activate the virtual environment before running any commands:

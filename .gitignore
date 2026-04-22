@@ -41,7 +41,12 @@ ENV/
 logs/
 
 # Results
-results/*.json
+results/
+
+# Data artifacts
+*.bak
+*.parquet
+peer_results
 
 # API keys and secrets
 .env
@@ -63,4 +68,7 @@ temp/
 # Generated figures
 figures/*.png
 figures/*.pdf
+
+# Tool configs
+.codex
 

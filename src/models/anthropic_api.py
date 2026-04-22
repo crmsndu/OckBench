@@ -1,30 +1,18 @@
-"""
-Anthropic Messages API client implementation.
-
-Uses the native /v1/messages endpoint with adaptive thinking support
-for Claude Opus 4.6 and Sonnet 4.6. Uses streaming to avoid proxy
-gateway timeouts on long-running thinking requests.
-"""
+"""Anthropic Messages API client with streaming and adaptive thinking."""
 import json
 import logging
 from typing import Optional
 
 import httpx
 
-from .base import BaseModelClient
 from ..core.schemas import ModelResponse, TokenUsage
-
+from .base import BaseModelClient
 
 logger = logging.getLogger(__name__)
 
 
 class AnthropicClient(BaseModelClient):
-    """
-    Client for Anthropic Messages API (/v1/messages) with streaming.
-
-    Supports adaptive thinking for Claude Opus 4.6 and Sonnet 4.6.
-    Uses streaming to bypass proxy gateway timeouts.
-    """
+    """Client for Anthropic /v1/messages with adaptive thinking and streaming."""
 
     def __init__(
         self,
@@ -61,7 +49,6 @@ class AnthropicClient(BaseModelClient):
         max_output_tokens: int = 4096,
         **kwargs
     ) -> ModelResponse:
-        """Call Anthropic Messages API with streaming to avoid gateway timeouts."""
         request_body = {
             "model": self.model,
             "max_tokens": max_output_tokens,
@@ -82,7 +69,7 @@ class AnthropicClient(BaseModelClient):
                 "POST", self.messages_url, headers=self.headers, json=request_body
             ) as resp:
                 if resp.status_code != 200:
-                    body = await resp.aread()
+                    await resp.aread()
                     raise httpx.HTTPStatusError(
                         f"HTTP {resp.status_code}",
                         request=resp.request,

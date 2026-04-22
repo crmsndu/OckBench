@@ -1,31 +1,18 @@
-"""
-OpenAI Responses API client implementation.
-
-Uses the /v1/responses endpoint which supports reasoning effort for
-models like gpt-5.4-pro that don't work with the chat completions endpoint.
-Uses streaming to avoid proxy gateway timeouts on long-running requests.
-"""
+"""OpenAI Responses API client (/v1/responses) with streaming."""
 import json
 import logging
 from typing import Optional
 
 import httpx
 
-from .base import BaseModelClient
 from ..core.schemas import ModelResponse, TokenUsage
-
+from .base import BaseModelClient
 
 logger = logging.getLogger(__name__)
 
 
 class OpenAIResponsesClient(BaseModelClient):
-    """
-    Client for OpenAI Responses API (/v1/responses).
-
-    Some models (e.g. gpt-5.4-pro) only support the Responses API,
-    not the Chat Completions API. This client also properly passes
-    reasoning effort parameters.
-    """
+    """Client for OpenAI /v1/responses (models that only support this endpoint)."""
 
     def __init__(
         self,
@@ -40,7 +27,6 @@ class OpenAIResponsesClient(BaseModelClient):
 
         self.endpoint = (base_url or "https://api.openai.com/v1").rstrip("/")
         if not self.endpoint.endswith("/v1"):
-            # If base_url already includes /v1, use as-is; otherwise append
             if "/v1" not in self.endpoint:
                 self.endpoint += "/v1"
         self.responses_url = self.endpoint + "/responses"
@@ -61,23 +47,18 @@ class OpenAIResponsesClient(BaseModelClient):
         max_output_tokens: int = 4096,
         **kwargs
     ) -> ModelResponse:
-        """Call OpenAI Responses API."""
         request_body = {
             "model": self.model,
             "input": prompt,
             "max_output_tokens": max_output_tokens,
+            "stream": True,
         }
 
-        # Set temperature for non-reasoning calls
         reasoning_effort = kwargs.get("reasoning_effort")
         if reasoning_effort:
             request_body["reasoning"] = {"effort": reasoning_effort}
-            # Reasoning models don't support temperature
         else:
             request_body["temperature"] = temperature
-
-        # Use streaming to avoid proxy gateway timeouts
-        request_body["stream"] = True
 
         try:
             text = ""
@@ -93,7 +74,7 @@ class OpenAIResponsesClient(BaseModelClient):
                 "POST", self.responses_url, headers=self.headers, json=request_body
             ) as resp:
                 if resp.status_code != 200:
-                    body = await resp.aread()
+                    await resp.aread()
                     raise httpx.HTTPStatusError(
                         f"HTTP {resp.status_code}",
                         request=resp.request,
@@ -145,7 +126,7 @@ class OpenAIResponsesClient(BaseModelClient):
             return ModelResponse(
                 text=text,
                 tokens=tokens,
-                latency=0,  # Set by base class
+                latency=0,
                 model=model_name,
                 finish_reason=status,
             )

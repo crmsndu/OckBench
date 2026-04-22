@@ -1,11 +1,8 @@
-"""
-Command-line argument parser for OckBench.
-"""
+"""Command-line argument parser for OckBench."""
 import argparse
 import sys
 from pathlib import Path
-from typing import Dict, Any
-
+from typing import Any, Dict
 
 # Task presets with default values
 TASK_PRESETS = {
@@ -130,7 +127,8 @@ Examples:
         "--max-context-window",
         type=int,
         default=None,
-        help="Maximum context window (input + output), dynamically calculates output tokens (mutually exclusive with --max-output-tokens)",
+        help="Maximum context window (input + output), dynamically calculates output tokens "
+             "(mutually exclusive with --max-output-tokens)",
     )
     parser.add_argument(
         "--reasoning-effort",
@@ -241,34 +239,12 @@ Examples:
 
 
 def parse_args(args=None) -> argparse.Namespace:
-    """
-    Parse command line arguments.
-
-    Args:
-        args: Optional list of arguments (for testing). If None, uses sys.argv.
-
-    Returns:
-        Parsed arguments namespace.
-    """
     parser = create_parser()
     return parser.parse_args(args)
 
 
 def build_config(args: argparse.Namespace) -> Dict[str, Any]:
-    """
-    Build configuration dictionary from args, applying presets and overrides.
-
-    Priority (highest to lowest):
-    1. CLI arguments
-    2. Config file
-    3. Task preset
-
-    Args:
-        args: Parsed argument namespace.
-
-    Returns:
-        Configuration dictionary ready to pass to run_benchmark.
-    """
+    """Build config dict. Priority: CLI args > config file > task preset."""
     config = {}
 
     # 1. Apply task preset
