@@ -160,7 +160,7 @@ for model in "${MODELS[@]}"; do
 
         cache_file="cache/${task}_${short}.jsonl"
 
-        python main.py --provider generic --model "$model" \
+        python main.py --provider chat_completion --model "$model" \
             --base-url "$BASE_URL" \
             --api-key dummy \
             --task "$task" \

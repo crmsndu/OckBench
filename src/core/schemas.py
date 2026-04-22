@@ -14,7 +14,7 @@ class BenchmarkConfig(BaseModel):
     dataset_name: Optional[str] = Field(None, description="Name of the dataset for logging")
     
     # Model config
-    provider: Literal["openai", "openai-responses", "anthropic", "gemini", "generic"] = Field(..., description="API provider type")
+    provider: Literal["chat_completion", "openai-responses", "anthropic", "gemini"] = Field(..., description="API provider type")
     model: str = Field(..., description="Model name/identifier")
     base_url: Optional[str] = Field(None, description="Base URL for API (for generic/local providers)")
     api_key: Optional[str] = Field(None, description="API key (can be from env)")

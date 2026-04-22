@@ -37,16 +37,16 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   # Run with OpenAI GPT-4o on math tasks
-  python main.py --model gpt-4o --provider openai --task math
+  python main.py --model gpt-4o --task math
 
   # Run with Gemini on coding tasks
   python main.py --model gemini-2.5-pro --provider gemini --task coding
 
   # Run with local model via vLLM
-  python main.py --model qwen3-4b --provider generic --base-url http://localhost:8000/v1
+  python main.py --model qwen3-4b --base-url http://localhost:8000/v1
 
-  # Run with custom dataset
-  python main.py --model gpt-4o --dataset-path data/custom.jsonl --evaluator-type math
+  # Run with OpenRouter
+  python main.py --model openai/gpt-4o-mini --base-url https://openrouter.ai/api/v1 --api-key $KEY
 
   # Load from config file with overrides
   python main.py --config config.yaml --model gpt-4o-mini
@@ -57,9 +57,9 @@ Examples:
     parser.add_argument(
         "--provider",
         type=str,
-        choices=["openai", "openai-responses", "anthropic", "gemini", "generic"],
-        default="openai",
-        help="API provider type (default: openai)",
+        choices=["chat_completion", "openai-responses", "anthropic", "gemini"],
+        default="chat_completion",
+        help="API provider type (default: chat_completion)",
     )
 
     # Task preset

@@ -28,16 +28,19 @@ Always activate the virtual environment before running any commands:
 source .venv/bin/activate
 ```
 
-API keys via environment variables: `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `API_KEY` / `API_BASE_URL` for generic providers.
+API keys via environment variables: `OPENAI_API_KEY` or `API_KEY` for chat_completion, `GEMINI_API_KEY` for Gemini, `ANTHROPIC_API_KEY` for Anthropic. `API_BASE_URL` sets the base URL.
 
 ## Running Benchmarks
 
 ```bash
-# OpenAI provider
-python main.py --provider openai --model gpt-4o --task math --max-output-tokens 8192
+# OpenAI
+python main.py --model gpt-4o --task math --max-output-tokens 8192
 
 # Local model via vLLM
-python main.py --provider generic --model Qwen/Qwen3-4B --base-url http://localhost:8000/v1 --max-context-window 40960 --task math
+python main.py --model Qwen/Qwen3-4B --base-url http://localhost:8000/v1 --max-context-window 40960 --task math
+
+# OpenRouter
+python main.py --model openai/gpt-4o-mini --base-url https://openrouter.ai/api/v1 --api-key $KEY --task math --max-output-tokens 8192
 
 # Using YAML config
 python main.py --config configs/openai.yaml

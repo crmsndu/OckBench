@@ -69,7 +69,7 @@ for task in "${TASKS[@]}"; do
 
         echo ""
         echo "--- $model | task=$task | max_tokens=$max_tokens ---"
-        python main.py --provider generic --model "$model" \
+        python main.py --provider chat_completion --model "$model" \
             --base-url "$BASE_URL" \
             --api-key "$ANTHROPIC_API_KEY" \
             --task "$task" --max-output-tokens "$max_tokens" \

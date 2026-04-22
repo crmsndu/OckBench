@@ -112,7 +112,7 @@ class BenchmarkRunner:
             'max_retries': self.config.max_retries,
         }
         
-        if self.config.provider == 'openai':
+        if self.config.provider == 'chat_completion':
             return OpenAIClient(**client_kwargs)
         elif self.config.provider == 'openai-responses':
             return OpenAIResponsesClient(**client_kwargs)
@@ -120,11 +120,6 @@ class BenchmarkRunner:
             return AnthropicClient(**client_kwargs)
         elif self.config.provider == 'gemini':
             return GeminiClient(**client_kwargs)
-        elif self.config.provider == 'generic':
-            # Generic uses OpenAI-compatible API
-            if not self.config.base_url:
-                raise ValueError("base_url is required for generic provider")
-            return OpenAIClient(**client_kwargs)
         else:
             raise ValueError(f"Unknown provider: {self.config.provider}")
     

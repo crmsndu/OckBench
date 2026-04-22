@@ -60,22 +60,21 @@ def _apply_env_vars(config_dict: Dict[str, Any]) -> Dict[str, Any]:
     # Handle API key from environment
     if not config_dict.get('api_key'):
         provider = config_dict.get('provider', '').lower()
-        
-        # Try provider-specific environment variables
+
         env_key_map = {
-            'openai': 'OPENAI_API_KEY',
-            'openai-responses': 'OPENAI_API_KEY',
-            'anthropic': 'ANTHROPIC_API_KEY',
-            'gemini': 'GEMINI_API_KEY',
-            'generic': 'API_KEY'
+            'chat_completion': ['OPENAI_API_KEY', 'API_KEY'],
+            'openai-responses': ['OPENAI_API_KEY'],
+            'anthropic': ['ANTHROPIC_API_KEY'],
+            'gemini': ['GEMINI_API_KEY'],
         }
-        
-        env_var = env_key_map.get(provider)
-        if env_var and os.getenv(env_var):
-            config_dict['api_key'] = os.getenv(env_var)
-    
-    # Handle base URL from environment for generic provider
-    if config_dict.get('provider') == 'generic' and not config_dict.get('base_url'):
+
+        for env_var in env_key_map.get(provider, []):
+            if os.getenv(env_var):
+                config_dict['api_key'] = os.getenv(env_var)
+                break
+
+    # Handle base URL from environment
+    if config_dict.get('provider') == 'chat_completion' and not config_dict.get('base_url'):
         if os.getenv('API_BASE_URL'):
             config_dict['base_url'] = os.getenv('API_BASE_URL')
     

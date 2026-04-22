@@ -6,7 +6,7 @@
 
 dataset_path: data/OckBench_math.jsonl
 dataset_name: OckBench_math
-provider: openai
+provider: chat_completion
 model: gpt-5.2
 max_output_tokens: 128000
 reasoning_effort: medium

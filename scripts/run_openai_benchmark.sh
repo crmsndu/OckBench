@@ -97,7 +97,7 @@ for model in "${MODELS[@]}"; do
             echo " $model | effort=$effort | task=$task"
             echo "========================================="
 
-            python main.py --provider openai --model "$model" \
+            python main.py --provider chat_completion --model "$model" \
                 --task "$task" --max-output-tokens "$max_tokens" \
                 --reasoning-effort "$effort" \
                 --concurrency "$CONCURRENCY" --timeout "$TIMEOUT" \
