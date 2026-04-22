@@ -26,12 +26,11 @@ def load_config(config_path: Optional[str] = None, **overrides) -> BenchmarkConf
 
 
 def _apply_env_vars(config_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Apply environment variables for API keys and base URL."""
+    """Apply environment variables for API keys (non-chat_completion providers only)."""
     if not config_dict.get('api_key'):
         provider = config_dict.get('provider', '').lower()
 
         env_key_map = {
-            'chat_completion': ['OPENAI_API_KEY', 'API_KEY'],
             'openai-responses': ['OPENAI_API_KEY'],
             'anthropic': ['ANTHROPIC_API_KEY'],
             'gemini': ['GEMINI_API_KEY'],
@@ -41,10 +40,6 @@ def _apply_env_vars(config_dict: Dict[str, Any]) -> Dict[str, Any]:
             if os.getenv(env_var):
                 config_dict['api_key'] = os.getenv(env_var)
                 break
-
-    if config_dict.get('provider') == 'chat_completion' and not config_dict.get('base_url'):
-        if os.getenv('API_BASE_URL'):
-            config_dict['base_url'] = os.getenv('API_BASE_URL')
 
     return config_dict
 

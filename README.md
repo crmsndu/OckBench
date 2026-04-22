@@ -51,10 +51,14 @@ Run on OpenAI:
 
 ```bash
 export OPENAI_API_KEY="sk-..."
+export OPENAI_BASE_URL="https://api.openai.com/v1"
 
-python main.py --model gpt-5.2 --task math --max-output-tokens 128000
-python main.py --model gpt-5.2 --task coding --max-output-tokens 128000
-python main.py --model gpt-5.2 --task science --max-output-tokens 128000
+python main.py --model gpt-5.2 --api-key $OPENAI_API_KEY --base-url $OPENAI_BASE_URL \
+    --task math --max-output-tokens 128000
+python main.py --model gpt-5.2 --api-key $OPENAI_API_KEY --base-url $OPENAI_BASE_URL \
+    --task coding --max-output-tokens 128000
+python main.py --model gpt-5.2 --api-key $OPENAI_API_KEY --base-url $OPENAI_BASE_URL \
+    --task science --max-output-tokens 128000
 ```
 
 Run on a local model via [vLLM](https://docs.vllm.ai/en/latest/usage/) (install vLLM first following their official docs):
@@ -66,6 +70,7 @@ vllm serve Qwen/Qwen3-4B --port 8000
 # Then run the benchmark
 python main.py \
     --model Qwen/Qwen3-4B \
+    --api-key dummy \
     --base-url http://localhost:8000/v1 \
     --max-context-window 40960 \
     --task math
@@ -84,13 +89,13 @@ Pass `--cache <path>` to save results incrementally. If a run is interrupted, re
 ```bash
 # Start a run
 python main.py --model Qwen/Qwen3-4B \
-    --base-url http://localhost:8000/v1 \
+    --api-key dummy --base-url http://localhost:8000/v1 \
     --max-context-window 40960 --task math \
     --cache cache/qwen3-4b-math.jsonl
 
 # Interrupted? Just re-run the same command — it picks up where it left off
 python main.py --model Qwen/Qwen3-4B \
-    --base-url http://localhost:8000/v1 \
+    --api-key dummy --base-url http://localhost:8000/v1 \
     --max-context-window 40960 --task math \
     --cache cache/qwen3-4b-math.jsonl
 ```

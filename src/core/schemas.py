@@ -35,7 +35,17 @@ class BenchmarkConfig(BaseModel):
     notes: Optional[str] = Field(None)
 
     @model_validator(mode='after')
-    def validate_token_config(self) -> 'BenchmarkConfig':
+    def validate_config(self) -> 'BenchmarkConfig':
+        if self.provider == 'chat_completion':
+            if not self.api_key:
+                raise ValueError(
+                    "chat_completion provider requires --api-key"
+                )
+            if not self.base_url:
+                raise ValueError(
+                    "chat_completion provider requires --base-url"
+                )
+
         has_max_output = self.max_output_tokens is not None
         has_max_context = self.max_context_window is not None
 
