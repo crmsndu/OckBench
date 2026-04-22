@@ -6,7 +6,7 @@
 cd /path/to/OckBench
 uv venv --python 3.12 --managed-python
 source .venv/bin/activate
-uv pip install -r requirements.txt
+uv pip install -e .
 ```
 
 ## 1. Claude Models

@@ -15,9 +15,6 @@ dependencies = [
     "tiktoken",
 ]
 
-[project.scripts]
-ockbench = "main:main"
-
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"

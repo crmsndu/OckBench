@@ -39,7 +39,7 @@ git clone https://github.com/OckBench/OckBench.git
 cd OckBench
 uv venv --python 3.12 --managed-python
 source .venv/bin/activate
-uv pip install -r requirements.txt
+uv pip install -e .
 ```
 
 You must specify either `--max-output-tokens` or `--max-context-window` to control generation length:
@@ -52,9 +52,9 @@ Run on OpenAI:
 ```bash
 export OPENAI_API_KEY="sk-..."
 
-python main.py --provider openai --model gpt-5.2 --task math --max-output-tokens 128000
-python main.py --provider openai --model gpt-5.2 --task coding --max-output-tokens 128000
-python main.py --provider openai --model gpt-5.2 --task science --max-output-tokens 128000
+python main.py --model gpt-5.2 --task math --max-output-tokens 128000
+python main.py --model gpt-5.2 --task coding --max-output-tokens 128000
+python main.py --model gpt-5.2 --task science --max-output-tokens 128000
 ```
 
 Run on a local model via [vLLM](https://docs.vllm.ai/en/latest/usage/) (install vLLM first following their official docs):
@@ -65,7 +65,6 @@ vllm serve Qwen/Qwen3-4B --port 8000
 
 # Then run the benchmark
 python main.py \
-    --provider generic \
     --model Qwen/Qwen3-4B \
     --base-url http://localhost:8000/v1 \
     --max-context-window 40960 \
@@ -84,13 +83,13 @@ Pass `--cache <path>` to save results incrementally. If a run is interrupted, re
 
 ```bash
 # Start a run
-python main.py --model Qwen/Qwen3-4B --provider generic \
+python main.py --model Qwen/Qwen3-4B \
     --base-url http://localhost:8000/v1 \
     --max-context-window 40960 --task math \
     --cache cache/qwen3-4b-math.jsonl
 
 # Interrupted? Just re-run the same command — it picks up where it left off
-python main.py --model Qwen/Qwen3-4B --provider generic \
+python main.py --model Qwen/Qwen3-4B \
     --base-url http://localhost:8000/v1 \
     --max-context-window 40960 --task math \
     --cache cache/qwen3-4b-math.jsonl
