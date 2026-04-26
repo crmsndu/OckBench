@@ -59,6 +59,7 @@ class AnthropicClient(BaseModelClient):
 
         try:
             text = ""
+            thinking_text = ""
             input_tokens = 0
             output_tokens = 0
             model_name = self.model
@@ -98,7 +99,10 @@ class AnthropicClient(BaseModelClient):
 
                             elif event_type == "content_block_delta":
                                 delta = d.get("delta", {})
-                                if delta.get("type") == "text_delta":
+                                delta_type = delta.get("type")
+                                if delta_type == "thinking_delta":
+                                    thinking_text += delta.get("thinking", "")
+                                elif delta_type == "text_delta":
                                     text += delta.get("text", "")
 
                             elif event_type == "message_delta":
@@ -109,10 +113,20 @@ class AnthropicClient(BaseModelClient):
                         except json.JSONDecodeError:
                             continue
 
+            # Anthropic reports total output_tokens (thinking + text) in message_delta usage.
+            # Estimate reasoning tokens from thinking text length when the API doesn't break them out.
+            if thinking_text:
+                estimated_thinking_tokens = len(thinking_text) // 4
+                reasoning_tokens = min(estimated_thinking_tokens, output_tokens)
+                answer_tokens = output_tokens - reasoning_tokens
+            else:
+                reasoning_tokens = 0
+                answer_tokens = output_tokens
+
             tokens = TokenUsage(
                 prompt_tokens=input_tokens,
-                answer_tokens=output_tokens,
-                reasoning_tokens=0,
+                answer_tokens=answer_tokens,
+                reasoning_tokens=reasoning_tokens,
                 output_tokens=output_tokens,
                 total_tokens=input_tokens + output_tokens,
             )

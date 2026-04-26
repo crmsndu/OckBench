@@ -109,6 +109,7 @@ class EvaluationResult(BaseModel):
 
     error: Optional[str] = Field(None)
     extraction_method: Optional[str] = Field(None)
+    finish_reason: Optional[str] = Field(None)
 
     tests_passed: Optional[int] = Field(None)
     tests_total: Optional[int] = Field(None)

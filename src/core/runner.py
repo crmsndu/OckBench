@@ -156,7 +156,8 @@ class BenchmarkRunner:
                         tokens=response.tokens,
                         latency=response.latency,
                         error=response.error,
-                        extraction_method="error"
+                        extraction_method="error",
+                        finish_reason=response.finish_reason,
                     )
                 else:
                     if self.config.evaluator_type == "code":
@@ -177,7 +178,8 @@ class BenchmarkRunner:
                         extraction_method=eval_result.extraction_method,
                         tests_passed=eval_result.tests_passed,
                         tests_total=eval_result.tests_total,
-                        execution_error=eval_result.execution_error
+                        execution_error=eval_result.execution_error,
+                        finish_reason=response.finish_reason,
                     )
 
                 self._append_to_cache(result)

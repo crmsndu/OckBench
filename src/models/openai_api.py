@@ -74,19 +74,36 @@ class OpenAIClient(BaseModelClient):
             if kwargs.get("presence_penalty") is not None:
                 request_params["presence_penalty"] = kwargs["presence_penalty"]
 
-        # Thinking mode for models served locally (Qwen3, DeepSeek via vLLM/SGLang)
-        if kwargs.get("enable_thinking") is not None:
-            thinking_key = "thinking" if "deepseek" in self.model.lower() else "enable_thinking"
-            request_params["extra_body"] = {
-                "chat_template_kwargs": {thinking_key: kwargs["enable_thinking"]}
-            }
+        base_url_lower = (self.base_url or "").lower()
+        is_deepseek_direct = "deepseek.com" in base_url_lower
+        is_openrouter = "openrouter" in base_url_lower
 
-        # OpenRouter uses a different extra_body format for reasoning
-        if "openrouter" in (self.base_url or ""):
+        if is_deepseek_direct:
+            # DeepSeek native API: {"thinking": {"type": "enabled"|"disabled"}}.
+            # Thinking is enabled by default; strip params the docs say are ignored
+            # in thinking mode (temperature, top_p, presence_penalty, frequency_penalty).
+            explicit_thinking = kwargs.get("enable_thinking")
+            thinking_on = explicit_thinking is not False
+            if explicit_thinking is not None:
+                thinking_type = "enabled" if explicit_thinking else "disabled"
+                request_params["extra_body"] = {"thinking": {"type": thinking_type}}
+            if kwargs.get("reasoning_effort"):
+                eb = request_params.setdefault("extra_body", {})
+                eb["reasoning_effort"] = kwargs["reasoning_effort"]
+            if thinking_on:
+                for p in ("temperature", "top_p", "presence_penalty", "frequency_penalty"):
+                    request_params.pop(p, None)
+        elif is_openrouter:
             if kwargs.get("enable_thinking"):
                 request_params["extra_body"] = {"reasoning": {"enabled": True}}
             elif kwargs.get("reasoning_effort") and not self._is_reasoning_model():
                 request_params["extra_body"] = {"reasoning": {"effort": kwargs["reasoning_effort"]}}
+        elif kwargs.get("enable_thinking") is not None:
+            # vLLM/SGLang local: chat_template_kwargs
+            thinking_key = "thinking" if "deepseek" in self.model.lower() else "enable_thinking"
+            request_params["extra_body"] = {
+                "chat_template_kwargs": {thinking_key: kwargs["enable_thinking"]}
+            }
 
         request_params["stream"] = True
         request_params["stream_options"] = {"include_usage": True}
@@ -118,12 +135,33 @@ class OpenAIClient(BaseModelClient):
                     output_tokens=0, total_tokens=0,
                 )
 
+            # Surface empty-text outcomes as errors so --cache resume will retry them.
+            # Common via chat-completion proxy + reasoning models: the whole budget is
+            # spent on reasoning_content and the stream ends without ever emitting
+            # a content delta.
+            empty_error = None
+            if not text:
+                if finish_reason == "length":
+                    empty_error = (
+                        "empty_response_length_finish: finish_reason=length with no content "
+                        "emitted (likely reasoning consumed entire output budget)"
+                    )
+                elif tokens.reasoning_tokens > 0:
+                    empty_error = (
+                        "empty_response_reasoning_only: model emitted reasoning tokens but "
+                        "no content (finish_reason="
+                        f"{finish_reason or 'unknown'})"
+                    )
+                elif usage_data is None:
+                    empty_error = "empty_response_no_stream: no usage and no content received"
+
             return ModelResponse(
                 text=text,
                 tokens=tokens,
                 latency=0,
                 model=model_name,
                 finish_reason=finish_reason or "stop",
+                error=empty_error,
             )
 
         except Exception as e:
