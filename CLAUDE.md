@@ -95,13 +95,47 @@ For models served via OpenRouter (`--base-url` containing "openrouter"), thinkin
 
 This is handled automatically in `src/models/openai_api.py`.
 
-## Plotting
+## DeepSeek Direct API
 
-`scripts/plot/bubble_plot_selected.py` generates accuracy-vs-token bubble plots from `results/model_summary_selected.csv`. Closed-source models use solid-edge circles (sized by tier), open-source models use dashed-edge circles (sized by active params).
+When `--base-url` contains `deepseek.com` (`https://api.deepseek.com`):
+- `--enable-thinking true|false` sends `{"thinking": {"type": "enabled|disabled"}}` in `extra_body`. Thinking is on by default server-side.
+- `--reasoning-effort <level>` sends `reasoning_effort` in `extra_body` (supported levels per docs: `high` default, `max` for complex agents).
+- Per DeepSeek docs, `temperature`, `top_p`, `presence_penalty`, `frequency_penalty` are silently ignored in thinking mode. The client strips them from the request when thinking is on so we don't send misleading parameters.
+- Env var for API key: `DEEPSEEK_API_KEY` (not auto-detected under `chat_completion` — pass explicitly via `--api-key`).
+- Pricing note: **HTTP 402 "Insufficient Balance" is not in the non-retryable list**, so an exhausted account retries 3× per problem before erroring out. Monitor balance at `GET /user/balance` with a Bearer header.
+
+## Chat-completion Proxy
+
+Base URL: `https://proxy.example/v1` — OpenAI-compatible. Model list: `GET /v1/models`. Per-model limits via `/key/info`.
+
+Quirks to know:
+- `max_total_tokens` (input + output combined) is hard-capped per model at the vLLM deployment's `max_model_len`. Caps observed so far: gemma-4-31b-it = 65,536; qwen3.6-27b / qwen3.6-35b-a3b = 131,072; kimi-k2.6 / glm-5.1 reject `max_tokens>=200K` cleanly, accept 262,144 silently and return empty choices (probe only — real work at 200K is fine).
+- Prefer `--max-context-window N` over `--max-output-tokens N` when the proxy enforces a combined cap. OckBench will compute `output_budget = N − input_tokens − 256` dynamically.
+- Reasoning models stream `reasoning_content` deltas separately from `content`; our client only reads `delta.content`, so the reasoning text is automatically dropped from the answer.
+- Reasoning models can spend the entire context budget inside `reasoning_content` on hard items and emit zero content deltas. Since April 2026 the client surfaces these as `empty_response_length_finish` / `empty_response_reasoning_only` errors (see Known Issues).
+- Sporadic **504 Gateway Timeout** (raw HTML body — comes from the nginx front-end, not LiteLLM) appears during brief backend instability. The client retries 3× with 1s/2s backoff which is too short for a real outage; affected rows land as errored and are refilled on `--cache` resume.
 
 ## Known Issues
 
-- **Silent empty responses**: API calls (especially via Azure proxy) can return empty `model_response` with `error=None` and all token counts at 0. The cache loader (`_load_cache`) treats these as successful, so `--cache` resume won't retry them. Workaround: merge results from a separate run to fill in the gaps (see `results/merged/`).
+- **Silent empty responses (historical)**: Before commit `55bddf0`, streaming calls could return `model_response=""` with `error=None` and the cache loader would treat them as successful, so `--cache` resume never retried them. The dominant cause on reasoning models served via the chat-completion proxy was **budget-exhausted thinking**: the full context budget spent emitting `reasoning_content` with zero `content` deltas. The client now sets `response.error` to one of:
+  - `empty_response_length_finish` — `finish_reason=length` with `text=""`
+  - `empty_response_reasoning_only` — `reasoning_tokens>0` with `text=""` and a non-length finish
+  - `empty_response_no_stream` — stream closed without any chunks
+  Rows with these errors are filtered out of `completed_ids` on cache load, so `--cache` resume retries them automatically. Pre-existing silent-empty rows in older caches still need manual cleanup (drop rows where `error is None and model_response == ""`) before resume will pick them up.
+
+- **Negative `answer_tokens` in token accounting**: On some proxy-routed models the `usage` object reports `reasoning_tokens > completion_tokens` (not the OpenAI subset convention). Our client computes `answer_tokens = completion_tokens − reasoning_tokens`, which can go negative. Total / output token counts remain correct; only the answer/reasoning split is distorted.
+
+- **Anthropic `thinking_tokens` are estimated**: The direct Anthropic Messages API's `message_delta.usage` only reports total `output_tokens`, not a thinking/text split. The client accumulates `thinking_delta` text and estimates `reasoning_tokens = len(thinking_text) // 4`, then back-solves `answer_tokens = output_tokens − reasoning_tokens`. This is approximate.
+
+## Helper Scripts
+
+- `scripts/run_deepseek_v4.sh <model>` — runs one DeepSeek v4 variant across math/coding/science on the Selected subset (thinking on, `reasoning_effort=max`, `max_output_tokens=384000`, `c=5`, caching enabled).
+- `scripts/run_proxy_v2.sh <model> <short_name> <max_output_tokens>` — runs one proxy-routed model across math/coding/science on the Selected subset at `c=1` with `--max-output-tokens`.
+- `scripts/run_proxy_v2_ctx.sh <model> <short_name> <max_context_window>` — same but with `--max-context-window` for models whose proxy deployment enforces a combined input+output cap.
+
+## Plotting
+
+`scripts/plot/bubble_plot_selected.py` generates accuracy-vs-token bubble plots from `results/model_summary_selected.csv`. Closed-source models use solid-edge circles (sized by tier), open-source models use dashed-edge circles (sized by active params).
 
 ## Directory Layout
 
