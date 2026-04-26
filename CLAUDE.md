@@ -104,20 +104,19 @@ When `--base-url` contains `deepseek.com` (`https://api.deepseek.com`):
 - Env var for API key: `DEEPSEEK_API_KEY` (not auto-detected under `chat_completion` — pass explicitly via `--api-key`).
 - Pricing note: **HTTP 402 "Insufficient Balance" is not in the non-retryable list**, so an exhausted account retries 3× per problem before erroring out. Monitor balance at `GET /user/balance` with a Bearer header.
 
-## Chat-completion Proxy
+## Chat-completion endpoint quirks
 
-Base URL: `https://proxy.example/v1` — OpenAI-compatible. Model list: `GET /v1/models`. Per-model limits via `/key/info`.
+Some runs route through a third-party OpenAI-compatible chat-completions endpoint (base URL and key supplied via `--base-url` / `--api-key`). Quirks to know:
 
-Quirks to know:
-- `max_total_tokens` (input + output combined) is hard-capped per model at the vLLM deployment's `max_model_len`. Caps observed so far: gemma-4-31b-it = 65,536; qwen3.6-27b / qwen3.6-35b-a3b = 131,072; kimi-k2.6 / glm-5.1 reject `max_tokens>=200K` cleanly, accept 262,144 silently and return empty choices (probe only — real work at 200K is fine).
-- Prefer `--max-context-window N` over `--max-output-tokens N` when the proxy enforces a combined cap. OckBench will compute `output_budget = N − input_tokens − 256` dynamically.
+- `max_total_tokens` (input + output combined) is hard-capped per model at the server's `max_model_len`. Caps observed so far: gemma-4-31b-it = 65,536; qwen3.6-27b / qwen3.6-35b-a3b = 131,072; kimi-k2.6 / glm-5.1 reject `max_tokens>=200K` cleanly, accept 262,144 silently and return empty choices (probe only — real work at 200K is fine).
+- Prefer `--max-context-window N` over `--max-output-tokens N` when the endpoint enforces a combined cap. OckBench will compute `output_budget = N − input_tokens − 256` dynamically.
 - Reasoning models stream `reasoning_content` deltas separately from `content`; our client only reads `delta.content`, so the reasoning text is automatically dropped from the answer.
 - Reasoning models can spend the entire context budget inside `reasoning_content` on hard items and emit zero content deltas. Since April 2026 the client surfaces these as `empty_response_length_finish` / `empty_response_reasoning_only` errors (see Known Issues).
-- Sporadic **504 Gateway Timeout** (raw HTML body — comes from the nginx front-end, not LiteLLM) appears during brief backend instability. The client retries 3× with 1s/2s backoff which is too short for a real outage; affected rows land as errored and are refilled on `--cache` resume.
+- Sporadic **504 Gateway Timeout** (raw HTML body from an nginx front-end) appears during brief backend instability. The client retries 3× with 1s/2s backoff which is too short for a real outage; affected rows land as errored and are refilled on `--cache` resume.
 
 ## Known Issues
 
-- **Silent empty responses (historical)**: Before commit `55bddf0`, streaming calls could return `model_response=""` with `error=None` and the cache loader would treat them as successful, so `--cache` resume never retried them. The dominant cause on reasoning models served via the chat-completion proxy was **budget-exhausted thinking**: the full context budget spent emitting `reasoning_content` with zero `content` deltas. The client now sets `response.error` to one of:
+- **Silent empty responses (historical)**: Before commit `55bddf0`, streaming calls could return `model_response=""` with `error=None` and the cache loader would treat them as successful, so `--cache` resume never retried them. The dominant cause on reasoning models routed through third-party chat-completion proxies was **budget-exhausted thinking**: the full context budget spent emitting `reasoning_content` with zero `content` deltas. The client now sets `response.error` to one of:
   - `empty_response_length_finish` — `finish_reason=length` with `text=""`
   - `empty_response_reasoning_only` — `reasoning_tokens>0` with `text=""` and a non-length finish
   - `empty_response_no_stream` — stream closed without any chunks
@@ -130,8 +129,8 @@ Quirks to know:
 ## Helper Scripts
 
 - `scripts/run_deepseek_v4.sh <model>` — runs one DeepSeek v4 variant across math/coding/science on the Selected subset (thinking on, `reasoning_effort=max`, `max_output_tokens=384000`, `c=5`, caching enabled).
-- `scripts/run_proxy_v2.sh <model> <short_name> <max_output_tokens>` — runs one proxy-routed model across math/coding/science on the Selected subset at `c=1` with `--max-output-tokens`.
-- `scripts/run_proxy_v2_ctx.sh <model> <short_name> <max_context_window>` — same but with `--max-context-window` for models whose proxy deployment enforces a combined input+output cap.
+- `scripts/run_proxy_v2.sh <model> <short_name> <max_output_tokens>` — runs one proxy-routed model across math/coding/science on the Selected subset at `c=1` with `--max-output-tokens`. Requires `OCKBENCH_API_KEY` and `OCKBENCH_BASE_URL` exported.
+- `scripts/run_proxy_v2_ctx.sh <model> <short_name> <max_context_window>` — same but with `--max-context-window` for models whose deployment enforces a combined input+output cap.
 
 ## Plotting
 

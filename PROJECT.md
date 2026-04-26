@@ -207,15 +207,15 @@ Validation happens at the `BenchmarkConfig` Pydantic model level:
 
 Reverse chronological. Each entry records what changed, why, and any notable outcomes.
 
-### 2026-04-24 — DeepSeek-v4 + chat-completion proxy wave
+### 2026-04-24 — DeepSeek-v4 + proxy-routed open-weight wave
 
 **New runs on Selected subset** (100 math + 60 coding + 40 science):
 
 - **DeepSeek direct API**: `deepseek-v4-flash` and `deepseek-v4-pro` at `https://api.deepseek.com`, thinking on, `reasoning_effort=max`, `max_output_tokens=384000`, `concurrency=5`.
-- **chat-completion proxy** (`https://proxy.example/v1`) at `concurrency=1`:
+- **Third-party chat-completion proxy** at `concurrency=1`:
   - `google/gemma-4-31b-it` (`max_ctx=65536`)
   - `qwen/qwen3-5-397b-a17b` (first pass `max_out=81920`, rerun at `max_ctx=262144`)
-  - `qwen/qwen3.6-35b-a3b`, `qwen3.6-27b` (`max_ctx=131072`, proxy-capped)
+  - `qwen/qwen3.6-35b-a3b`, `qwen3.6-27b` (`max_ctx=131072`, endpoint-capped)
   - `moonshotai/kimi-k2.6` (first pass `max_out=131072`, rerun at `max_ctx=262144`)
   - `zai-org/glm-5.1` (first pass `max_out=131072`, rerun at `max_ctx=202752`)
   - `minimaxai/minimax-m2.7` (`max_out=131072`)
@@ -229,7 +229,7 @@ Reverse chronological. Each entry records what changed, why, and any notable out
 
 **Empty-response investigation** (diagnosis):
 
-The chat-completion proxy produced silent empty responses at rates up to ~50 % on the hardest math items for several reasoning models. Inspecting the caches revealed three cache signatures — all the same underlying event (**budget-exhausted thinking: the full context budget spent on `reasoning_content`, not a single `content` delta emitted**) expressed differently in how the proxy serialized `usage`:
+The proxy produced silent empty responses at rates up to ~50 % on the hardest math items for several reasoning models. Inspecting the caches revealed three cache signatures — all the same underlying event (**budget-exhausted thinking: the full context budget spent on `reasoning_content`, not a single `content` delta emitted**) expressed differently in how the proxy serialized `usage`:
 
 | Mode | Signature | Cause |
 |---|---|---|
@@ -271,7 +271,7 @@ Client fix surfaces all three as `empty_response_*` errors so `--cache` resume r
 
 **Models:** Qwen3.5-397B-A17B, Qwen3.5-122B-A10B, Qwen3.5-35B-A3B, Qwen3.5-9B, Gemini-3.1-Flash-Lite, MiniMax-M2.7
 **Tasks:** math, coding, science (full dataset + Selected subset for Qwen models)
-**Infrastructure:** Qwen models served locally via SGLang on GPUs; Gemini via GCP; MiniMax via their API
+**Infrastructure:** Qwen models served locally via SGLang on local GPUs; Gemini via GCP; MiniMax via their API
 **Notes:** Qwen3.5 series evaluated across 4 model sizes to study the Overthinking Tax — larger models are both more accurate and more token-efficient, confirming the scaling hypothesis.
 
 ### 2026-03-30 — Qwen-235B + Selected subset runs

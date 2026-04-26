@@ -136,7 +136,7 @@ class OpenAIClient(BaseModelClient):
                 )
 
             # Surface empty-text outcomes as errors so --cache resume will retry them.
-            # Common via chat-completion proxy + reasoning models: the whole budget is
+            # Common on third-party chat-completion proxies + reasoning models: the whole budget is
             # spent on reasoning_content and the stream ends without ever emitting
             # a content delta.
             empty_error = None

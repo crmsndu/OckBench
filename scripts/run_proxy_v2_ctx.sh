@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Like run_proxy_v2.sh but uses --max-context-window (for models with a
 # combined input+output cap rather than a separate output cap).
+# Expects OCKBENCH_API_KEY and OCKBENCH_BASE_URL to be exported.
 # Usage: run_proxy_v2_ctx.sh <model_id> <short_name> <max_context_window>
 set -u
 cd "$(dirname "$0")/.."
 source .venv/bin/activate
+
+: "${OCKBENCH_API_KEY:?export OCKBENCH_API_KEY}"
+: "${OCKBENCH_BASE_URL:?export OCKBENCH_BASE_URL}"
 
 MODEL="${1:?model required}"
 SHORT="${2:?short name required}"
@@ -26,7 +30,7 @@ for task in math coding science; do
     --provider chat_completion \
     --model "$MODEL" \
     --api-key "$OCKBENCH_API_KEY" \
-    --base-url https://proxy.example/v1 \
+    --base-url "$OCKBENCH_BASE_URL" \
     --task "$task" \
     --dataset-path "$ds" \
     --dataset-name "$name" \
